@@ -9,14 +9,15 @@ SAMPLES = [str(s) for s in config["samples"].keys()]
 DATA_DIR =str(config["io"]["data"])
 OUTPUT_DIR = str(config["io"]["output"])
 
+SAMPLE_MAP = config["samples"]
+
 rule symlink_data:
     output:
         r1 = str(OUTPUT_DIR+"/qc/raw/{sample}_1.fastq.gz"),
         r2 = str(OUTPUT_DIR+"/qc/raw/{sample}_2.fastq.gz")
     run:
-        in_r1 = str(DATA_DIR+"/"+readmap[wildcards.sample][0])
-        in_r2 = str(DATA_DIR+"/"+readmap[wildcards.sample][0])
-        # print(in_r1, in_r2)
+        in_r1 = str(DATA_DIR+"/"+SAMPLE_MAP[wildcards.sample][0])
+        in_r2 = str(DATA_DIR+"/"+SAMPLE_MAP[wildcards.sample][0])
         subprocess.run(["ln", "-sr", in_r1, output.r1])
         subprocess.run(["ln", "-sr", in_r2, output.r2])
 
@@ -60,29 +61,32 @@ rule combine_extracted:
         summary = str(OUTPUT_DIR+"/summary/counts/all_first50.csv")
     run:
         import pandas
-        def merge_all(df_list):
-            if len(df_list) == 1:
-                return(df_list[0])
+        def open_merge_all(fp_list):
+            """
+            Helper function to recursively open and merge multiple counts tables.
+            """
+            sample_name = fp_list[0].split("/")[-1].replace("_first50.csv", "")
+            if len(fp_list) == 1:
+                return(pandas.read_csv(fp_list[0], names = [sample_name, "seq"]))
             else:
-                return(pandas.merge(df_list[0], merge_all(df_list[1:]), on='seq', how='outer'))
-        all_dfs = []
-        # TODO: improve memory use; ONLY read in a df when merging it (not have all in memory)
-        for i in input.counts:
-            sample_name = i.split("/")[-1].replace("_first50.csv", "")
-            all_dfs.append(pandas.read_csv(i, names = [sample_name, "seq"]))
-        summary_df = merge_all(all_dfs)
+                new_df = pandas.read_csv(fp_list[0], names = [sample_name, "seq"])
+                return(pandas.merge(new_df, open_merge_all(fp_list[1:]), on='seq', how='outer'))
+
+        summary_df = open_merge_all(input.counts)
         summary_df.to_csv(output.summary, index=False)
+
+
 
 # make more elegant by having a single combination rule for all types of analyses (e.g. exact match vs. aligned)
 
-rule incorporate_metadata:
-    input:
-        summary = str(OUTPUT_DIR+"/summary/counts/all_first50.csv"),
-        md = str(config['metadata'])
-    output:
-        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first50.csv")
-    run:
-        import pandas
+#rule incorporate_metadata:
+#    input:
+#        summary = str(OUTPUT_DIR+"/summary/counts/all_first50.csv"),
+#        md = str(config['metadata'])
+#    output:
+#        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first50.csv")
+#    run:
+#        import pandas
         # TODO: check if md df has a 'seq' column 
-        md_df = pandas.merge(pandas.read_csv(input.summary), pandas.read_csv(input.md), on='seq', how='outer')
-        md_df.to_csv(output.md_summary, index=False)
+#        md_df = pandas.merge(pandas.read_csv(input.summary), pandas.read_csv(input.md), on='seq', how='outer')
+#        md_df.to_csv(output.md_summary, index=False)
