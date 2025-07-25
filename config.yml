@@ -1,0 +1,6 @@
+io:
+  data: ""
+  output: ""
+samples:
+  sample_1: ["s1_read_file_r1.fastq.gz","s1_read_file_r2.fastq.gz"]
+  sample_1: ["s2_read_file_r1.fastq.gz","s2_read_file_r2.fastq.gz"]
