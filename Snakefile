@@ -79,14 +79,30 @@ rule combine_extracted:
 
 # make more elegant by having a single combination rule for all types of analyses (e.g. exact match vs. aligned)
 
-#rule incorporate_metadata:
-#    input:
-#        summary = str(OUTPUT_DIR+"/summary/counts/all_first50.csv"),
-#        md = str(config['metadata'])
-#    output:
-#        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first50.csv")
-#    run:
-#        import pandas
+rule incorporate_metadata:
+    input:
+        summary = str(OUTPUT_DIR+"/summary/counts/all_first50.csv"),
+        md = str(config['io']['metadata'])
+    output:
+        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first50.csv")
+    run:
+        import pandas
         # TODO: check if md df has a 'seq' column 
-#        md_df = pandas.merge(pandas.read_csv(input.summary), pandas.read_csv(input.md), on='seq', how='outer')
-#        md_df.to_csv(output.md_summary, index=False)
+        md_df = pandas.merge(pandas.read_csv(input.summary), pandas.read_csv(input.md), left_on='seq', right_on="oligo_first_50", how='outer')
+        md_df.to_csv(output.md_summary, index=False)
+
+
+rule summarize_collapse_unmapped:
+    input:
+        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first50.csv")
+    output:
+        md_collapsed = str(OUTPUT_DIR+"/summary/counts/all_md_collapsed_first50.csv")
+    run:
+        import pandas
+        df_summary = pandas.read_csv(input.md_summary)
+        collapsed_summary = df_summary[["pep_id"]+SAMPLES].groupby("pep_id",dropna=False).sum()
+        collapsed_summary.to_csv(output.md_collapsed)
+
+
+        
+
