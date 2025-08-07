@@ -103,6 +103,23 @@ rule summarize_collapse_unmapped:
         collapsed_summary = df_summary[["pep_id"]+SAMPLES].groupby("pep_id",dropna=False).sum()
         collapsed_summary.to_csv(output.md_collapsed)
 
+rule extract_translate_first_120:
+    input:
+        r1 = str(OUTPUT_DIR+"/qc/raw/{sample}_1.fastq")
+    output:
+        s120 = str(OUTPUT_DIR+"/summary/counts/translations/{sample}_first120.csv")
+    threads: 1
+    run:
+        from Bio import SeqIO
+        from Bio.Seq import Seq
+        scount = dd(int)
+        for record in SeqIO.parse(input.r1, format = "fastq"):
+            scount[record.seq[:120]] += 1
+        o = open(output.s120,"w")
+        for k in scount.keys():
+            o.write(str(scount[k])+","+str(Seq(k).translate())+","+str(k)+"\n")
+        o.close()
 
-        
-
+rule all_extract_120:
+    input:
+        expand(str(OUTPUT_DIR+"/summary/counts/translations/{sample}_first120.csv"), sample=SAMPLES)
