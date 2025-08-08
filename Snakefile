@@ -123,3 +123,40 @@ rule extract_translate_first_120:
 rule all_extract_120:
     input:
         expand(str(OUTPUT_DIR+"/summary/counts/translations/{sample}_first120.csv"), sample=SAMPLES)
+
+rule map_120:
+    input:
+        pep_tables = str(OUTPUT_DIR+"/summary/counts/translations/{sample}_first120.csv"),
+        db = str(config['io']['pep_fasta'])
+    output:
+        annotated = str(OUTPUT_DIR+"/summary/counts/annotations/{sample}_first120.csv")
+    threads: 1
+    run:
+        from Bio import SeqIO
+        prot_db = list(SeqIO.parse(input.db,"fasta"))
+        # danger: reads full file into memory, need a lot of memory for big files
+        o = open(output.annotated, 'w')
+        counter = 0
+        with open(input.pep_tables, 'r') as f:
+            for line in f:
+                pep = line.split(",")[1]
+                if "*" in pep:
+                    o.write(line.strip()+',internal_stop\n')
+                else:
+                    matches = []
+                    for record in prot_db:
+                        pos = record.seq.find(pep)
+                        if pos >= 0:
+                            matches.append([pos,record.id])
+                    if len(matches) == 0:
+                        o.write(line.strip()+',no_exact_matches\n')
+                    else:
+                        o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
+                counter += 1
+                if counter % 100 == 0:
+                    print("processed "+str(counter))
+        o.close()
+
+rule all_map_120:
+    input:
+        expand(str(OUTPUT_DIR+"/summary/counts/annotations/{sample}_first120.csv"), sample=SAMPLES)
