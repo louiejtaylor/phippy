@@ -5,6 +5,8 @@ from collections import defaultdict as dd
 #include: rules/map.smk
 #include: rules/summary.smk
 
+from pathlib import Path
+
 SAMPLES = [str(s) for s in config["samples"].keys()]
 DATA_DIR =str(config["io"]["data"])
 OUTPUT_DIR = str(config["io"]["output"])
