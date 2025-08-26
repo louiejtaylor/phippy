@@ -8,10 +8,12 @@ from collections import defaultdict as dd
 from pathlib import Path
 
 SAMPLES = [str(s) for s in config["samples"].keys()]
-DATA_DIR =str(config["io"]["data"])
+DATA_DIR = str(config["io"]["data"])
 OUTPUT_DIR = str(config["io"]["output"])
 
 SAMPLE_MAP = config["samples"]
+
+summary_n = config["io"]["n_bases"]
 
 rule symlink_data:
     output:
@@ -36,38 +38,40 @@ rule uncompress_fastqs:
         gunzip {input.gzipped} -c > {output.unzipped}
         """
 
-rule extract_first_50:
+rule extract_first_n:
     input:
         r1 = str(OUTPUT_DIR+"/qc/raw/{sample}_1.fastq")
     output:
-        s50 = str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first120.csv")
+        s_n = str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first"+str(summary_n)+".csv")
+    params: n = int(summary_n)
     threads: 1
     run:
         from Bio import SeqIO
         scount = dd(int)
         for record in SeqIO.parse(input.r1, format = "fastq"):
-            scount[record.seq[:50]] += 1
-        o = open(output.s50,"w")
+            scount[record.seq[:params.n]] += 1
+        o = open(output.s_n,"w")
         for k in scount.keys():
             o.write(str(scount[k])+","+str(k)+"\n")
         o.close()
 
 rule all_extract:
     input:
-        expand(str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first120.csv"), sample=SAMPLES)
+        expand(str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first+"+str(summary_n)+".csv"), sample=SAMPLES)
 
 rule combine_extracted:
     input:
-        counts = expand(str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first120.csv"), sample=SAMPLES)
+        counts = expand(str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
     output:
-        summary = str(OUTPUT_DIR+"/summary/counts/all_first120.csv")
+        summary = str(OUTPUT_DIR+"/summary/counts/all_first"+str(summary_n)+".csv")
+    params: n = int(summary_n)
     run:
         import pandas
         def open_merge_all(fp_list):
             """
             Helper function to recursively open and merge multiple counts tables.
             """
-            sample_name = fp_list[0].split("/")[-1].replace("_first120.csv", "")
+            sample_name = fp_list[0].split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
             if len(fp_list) == 1:
                 return(pandas.read_csv(fp_list[0], names = [sample_name, "seq"]))
             else:
@@ -81,10 +85,10 @@ rule combine_extracted:
 
 rule incorporate_metadata:
     input:
-        summary = str(OUTPUT_DIR+"/summary/counts/all_first120.csv"),
+        summary = str(OUTPUT_DIR+"/summary/counts/all_first"+str(summary_n)+".csv"),
         md = str(config['io']['metadata'])
     output:
-        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first120.csv")
+        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first"+str(summary_n)+".csv")
     run:
         import pandas
         # TODO: check if md df has a 'seq' column 
@@ -94,13 +98,13 @@ rule incorporate_metadata:
 
 rule summarize_collapse_unmapped:
     input:
-        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first120.csv")
+        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first"+str(summary_n)+".csv")
     output:
-        md_collapsed = str(OUTPUT_DIR+"/summary/counts/all_md_collapsed_first120.csv")
+        md_collapsed = str(OUTPUT_DIR+"/summary/counts/all_md_collapsed_first"+str(summary_n)+".csv")
     run:
         import pandas
         df_summary = pandas.read_csv(input.md_summary)
-        collapsed_summary = df_summary[["pep_id"]+SAMPLES].groupby("pep_id",dropna=False).sum()
+        collapsed_summary = df_summary[["Barcode ID"]+SAMPLES].groupby("Barcode ID",dropna=False).sum()
         collapsed_summary.to_csv(output.md_collapsed)
 
 rule extract_translate_first_120:
