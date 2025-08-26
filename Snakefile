@@ -38,7 +38,7 @@ rule uncompress_fastqs:
         gunzip {input.gzipped} -c > {output.unzipped}
         """
 
-rule extract_first_n:
+rule extract_translate_first_n:
     input:
         r1 = str(OUTPUT_DIR+"/qc/raw/{sample}_1.fastq")
     output:
@@ -47,12 +47,13 @@ rule extract_first_n:
     threads: 1
     run:
         from Bio import SeqIO
+        from Bio.Seq import Seq
         scount = dd(int)
         for record in SeqIO.parse(input.r1, format = "fastq"):
             scount[record.seq[:params.n]] += 1
         o = open(output.s_n,"w")
         for k in scount.keys():
-            o.write(str(scount[k])+","+str(k)+"\n")
+            o.write(str(scount[k])+","+str(k)+","+str(Seq(k).translate())+"\n")
         o.close()
 
 rule all_extract:
@@ -73,9 +74,9 @@ rule combine_extracted:
             """
             sample_name = fp_list[0].split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
             if len(fp_list) == 1:
-                return(pandas.read_csv(fp_list[0], names = [sample_name, "seq"]))
+                return(pandas.read_csv(fp_list[0], names = [sample_name, "seq", "aas"]))
             else:
-                new_df = pandas.read_csv(fp_list[0], names = [sample_name, "seq"])
+                new_df = pandas.read_csv(fp_list[0], names = [sample_name, "seq", "aas"])
                 return(pandas.merge(new_df, open_merge_all(fp_list[1:]), on='seq', how='outer'))
 
         summary_df = open_merge_all(input.counts)

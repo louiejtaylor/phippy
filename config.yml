@@ -4,7 +4,14 @@ io:
   n_bases: 120 # number of bases to truncate library to (if applicable)
   metadata: "map.csv"
   pep_fasta: "" 
- 
+
+dbs:
+  db1:
+    fp: ""
+    format: "nt" # "nt" or "aa"
+    id_col: "uid" # column name - peptide uid
+    seq_col: "seq" # column name - peptide/nt sequence
+
 samples:
   sample_1: ["s1_read_file_r1.fastq.gz","s1_read_file_r2.fastq.gz"]
   sample_1: ["s2_read_file_r1.fastq.gz","s2_read_file_r2.fastq.gz"]
