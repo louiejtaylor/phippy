@@ -1,0 +1,28 @@
+name: workflow-test
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test workflow
+        run: |
+          wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+          START_DIR=$(pwd)
+          bash Miniconda3-latest-Linux-x86_64.sh -b -p $START_DIR/miniconda3
+          export PATH=${PATH}:$START_DIR/miniconda3/bin
+          CONDA_BASE=$(conda info --base)
+          source $CONDA_BASE/etc/profile.d/conda.sh
+          conda create -n wf_test
+          conda activate wf_test
+          conda install -qy snakemake -c conda-forge -c bioconda
+          pip install biopython 
+          cd example
+          snakemake summarize_collapse_unmapped -p --snakefile ../Snakefile --configfile test_config.yml --cores 1

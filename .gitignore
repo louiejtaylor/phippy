@@ -54,6 +54,7 @@ cover/
 # Snakemake and conda
 .snakemake/
 .conda/
+tests/output/
 
 # Translations
 *.mo
