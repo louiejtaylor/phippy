@@ -1,17 +1,16 @@
 io:
-  data: ""
-  output: "output/"
+  data: "/path/to/data" # .fastq.gz location
+  output: "/path/to/save/output"
   n_bases: 120 # number of bases to truncate library to (if applicable)
-  metadata: "map.csv"
-  pep_fasta: "" 
+  pep_fasta: "" # only used if you need to *de novo* create a map between protein sequence and peptides
 
 dbs:
   db1:
-    fp: ""
-    format: "nt" # "nt" or "aa"
+    fp: "map.csv" # path to sequence (aa or nt) to identifier map
+    format: "nt" # match on "nt" or "aa" sequence
     id_col: "uid" # column name - peptide uid
     seq_col: "seq" # column name - peptide/nt sequence
 
-samples:
+samples: # sample filenames
   sample_1: ["s1_read_file_r1.fastq.gz","s1_read_file_r2.fastq.gz"]
   sample_2: ["s2_read_file_r1.fastq.gz","s2_read_file_r2.fastq.gz"]

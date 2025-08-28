@@ -2,15 +2,19 @@ io:
   data: "test_data/"
   output: "output/"
   n_bases: 120 # number of bases to truncate library to (if applicable)
-  metadata: "test_map.csv"
   pep_fasta: "" 
 
 dbs:
-  db1:
-    fp: ""
+  map1:
+    fp: "test_map.csv"
     format: "nt" # "nt" or "aa"
     id_col: "uid" # column name - peptide uid
     seq_col: "seq" # column name - peptide/nt sequence
+  map2:
+    fp: "test_addl_map.csv"
+    format: "aa" # "nt" or "aa"
+    id_col: "unique_identifier" # column name - peptide uid
+    seq_col: "amino_acids" # column name - peptide/nt sequence
 
 samples:
   test_sample_1: ["test_s1_r1.fastq.gz","test_s1_r2.fastq.gz"]
