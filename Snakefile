@@ -7,11 +7,15 @@ from collections import defaultdict as dd
 
 from pathlib import Path
 
-SAMPLES = [str(s) for s in config["samples"].keys()]
+SAMPLE_MAP = config["samples"]
+SAMPLES = [str(s) for s in SAMPLE_MAP.keys()]
+
+DB_MAP = config["dbs"]
+DBS = [str(s) for s in DB_MAP.keys()]
+
 DATA_DIR = str(config["io"]["data"])
 OUTPUT_DIR = str(config["io"]["output"])
 
-SAMPLE_MAP = config["samples"]
 
 summary_n = config["io"]["n_bases"]
 
@@ -21,7 +25,7 @@ rule symlink_data:
         r2 = str(OUTPUT_DIR+"/qc/raw/{sample}_2.fastq.gz")
     run:
         in_r1 = str(DATA_DIR+"/"+SAMPLE_MAP[wildcards.sample][0])
-        in_r2 = str(DATA_DIR+"/"+SAMPLE_MAP[wildcards.sample][0])
+        in_r2 = str(DATA_DIR+"/"+SAMPLE_MAP[wildcards.sample][1])
         subprocess.run(["ln", "-sr", in_r1, output.r1])
         subprocess.run(["ln", "-sr", in_r2, output.r2])
 
@@ -60,18 +64,26 @@ rule all_extract:
     input:
         expand(str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first+"+str(summary_n)+".csv"), sample=SAMPLES)
 
-rule map_to_peptide_db:
+rule symlink_peptide_map:
+    output: 
+        pep_map = str(OUTPUT_DIR+"/dbs/pep_maps/{db}.csv")
+    run:
+        in_map = str(DB_MAP[wildcards.db]["fp"])
+        subprocess.run(["ln", "-sr", in_map, output.pep_map])
+
+rule map_to_peptides:
     input:
         pep_summary = str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first"+str(summary_n)+".csv"),
-        pep_db = str(config['io']['metadata'])
+        pep_db = str(OUTPUT_DIR+"/dbs/pep_maps/{db}.csv")
     output:
-        mapped = str(OUTPUT_DIR+"/summary/counts/mapped/{sample}_first"+str(summary_n)+".csv")
+        mapped = str(OUTPUT_DIR+"/summary/counts/mapped/{db}/{sample}_first"+str(summary_n)+".csv")
     params:
         sample = "{sample}",
+        db = "{db}",
         n = int(summary_n)
     run:
         map_df = pandas.read_csv(input.pep_db)
-        map_df["_seq_n"] = map_df.apply(lambda r: r.seq[:params.n], axis = 1)
+        map_df["_seq_n"] = map_df.apply(lambda r: r["seq"][:params.n], axis = 1)
         mapped_df = pandas.merge(pandas.read_csv(input.pep_summary,names = [params.sample, "seq", "aas"]), 
                                  map_df[["_seq_n","uid"]], 
                                  left_on='seq', right_on='_seq_n', how='outer'
@@ -86,9 +98,9 @@ rule map_to_peptide_db:
 
 rule summarize_mapped:
     input:
-        counts = expand(str(OUTPUT_DIR+"/summary/counts/mapped/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
+        counts = expand(str(OUTPUT_DIR+"/summary/counts/mapped/{{db}}/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
     output:
-        summary = str(OUTPUT_DIR+"/summary/counts/all_mapped_first"+str(summary_n)+".csv")
+        summary = str(OUTPUT_DIR+"/summary/counts/mapped/{db}_all_mapped_first"+str(summary_n)+".csv")
     params: n = int(summary_n)
     run:
         def open_merge_all(fp_list):
@@ -104,6 +116,10 @@ rule summarize_mapped:
 
         summary_df = open_merge_all(input.counts)
         summary_df.to_csv(output.summary, index=False)
+
+rule all_map:
+    input:
+        maps = expand(str(OUTPUT_DIR+"/summary/counts/mapped/{db}_all_mapped_first"+str(summary_n)+".csv"), db=DBS)
 
 #rule map_to_protein_db:
 #    input:

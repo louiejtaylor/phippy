@@ -2,12 +2,11 @@ io:
   data: ""
   output: "output/"
   n_bases: 120 # number of bases to truncate library to (if applicable)
-  metadata: "map.csv"
-  pep_fasta: "" 
+  pep_fasta: "" # only used if you need to *de novo* create a map
 
 dbs:
   db1:
-    fp: ""
+    fp: "map.csv"
     format: "nt" # "nt" or "aa"
     id_col: "uid" # column name - peptide uid
     seq_col: "seq" # column name - peptide/nt sequence
