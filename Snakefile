@@ -1,4 +1,4 @@
-import subprocess
+import subprocess, pandas
 from collections import defaultdict as dd
 
 #include: rules/qc.smk
@@ -87,7 +87,6 @@ rule summarize_mapped:
         summary = str(OUTPUT_DIR+"/summary/counts/all_mapped_first"+str(summary_n)+".csv")
     params: n = int(summary_n)
     run:
-        import pandas
         def open_merge_all(fp_list):
             """
             Helper function to recursively open and merge multiple counts tables.
