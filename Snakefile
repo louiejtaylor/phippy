@@ -105,7 +105,7 @@ rule summarize_collapse_unmapped:
     run:
         import pandas
         df_summary = pandas.read_csv(input.md_summary)
-        collapsed_summary = df_summary[["Barcode ID"]+SAMPLES].groupby("Barcode ID",dropna=False).sum()
+        collapsed_summary = df_summary[["uid"]+SAMPLES].groupby("uid",dropna=False).sum()
         collapsed_summary.to_csv(output.md_collapsed)
 
 rule map_to_protein_db:

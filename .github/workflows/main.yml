@@ -24,5 +24,5 @@ jobs:
           conda activate wf_test
           conda install -qy snakemake -c conda-forge -c bioconda
           pip install biopython 
-          cd example
+          cd tests
           snakemake summarize_collapse_unmapped -p --snakefile ../Snakefile --configfile test_config.yml --cores 1
