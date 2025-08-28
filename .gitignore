@@ -51,10 +51,11 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Snakemake and conda
+# Snakemaken conda, testing
 .snakemake/
 .conda/
 tests/output/
+slurm*
 
 # Translations
 *.mo
