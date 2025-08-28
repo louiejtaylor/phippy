@@ -42,7 +42,7 @@ rule extract_translate_first_n:
     input:
         r1 = str(OUTPUT_DIR+"/qc/raw/{sample}_1.fastq")
     output:
-        s_n = str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first"+str(summary_n)+".csv")
+        s_n = str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first"+str(summary_n)+".csv")
     params: n = int(summary_n)
     threads: 1
     run:
@@ -58,13 +58,33 @@ rule extract_translate_first_n:
 
 rule all_extract:
     input:
-        expand(str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first+"+str(summary_n)+".csv"), sample=SAMPLES)
+        expand(str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first+"+str(summary_n)+".csv"), sample=SAMPLES)
 
-rule combine_extracted:
+rule map_to_peptide_db:
     input:
-        counts = expand(str(OUTPUT_DIR+"/summary/counts/samples/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
+        pep_summary = str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first"+str(summary_n)+".csv"),
+        pep_db = str(config['io']['metadata'])
     output:
-        summary = str(OUTPUT_DIR+"/summary/counts/all_first"+str(summary_n)+".csv")
+        mapped = str(OUTPUT_DIR+"/summary/counts/mapped/{sample}_first"+str(summary_n)+".csv")
+    params: sample = "{sample}"
+    run:
+        mapped_df = pandas.merge(pandas.read_csv(input.pep_summary,names = [params.sample, "seq", "aas"]), 
+                                 pandas.read_csv(input.pep_db), 
+                                 on='seq', how='outer'
+                                )
+        collapsed_summary = mapped_df[["uid",params.sample]].groupby("uid",dropna=False).sum()
+        collapsed_summary.to_csv(output.mapped)
+
+# for large datasets, combine_extracted has a large memory requirement. options to mitigate:
+# (1) map on a samplewise basis. low memory, but repeated computations (probably fine)
+# (2) analyze only peptide sequence (not nt)
+# (3) filter out peptides with internal stops
+
+rule summarize_mapped:
+    input:
+        counts = expand(str(OUTPUT_DIR+"/summary/counts/mapped/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
+    output:
+        summary = str(OUTPUT_DIR+"/summary/counts/all_mapped_first"+str(summary_n)+".csv")
     params: n = int(summary_n)
     run:
         import pandas
@@ -74,70 +94,44 @@ rule combine_extracted:
             """
             sample_name = fp_list[0].split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
             if len(fp_list) == 1:
-                return(pandas.read_csv(fp_list[0], names = [sample_name, "seq", "aas"]))
+                return(pandas.read_csv(fp_list[0]))
             else:
-                new_df = pandas.read_csv(fp_list[0], names = [sample_name, "seq", "aas"])
-                return(pandas.merge(new_df, open_merge_all(fp_list[1:]), on='seq', how='outer'))
+                new_df = pandas.read_csv(fp_list[0])
+                return(pandas.merge(new_df, open_merge_all(fp_list[1:]), on='uid', how='outer'))
 
         summary_df = open_merge_all(input.counts)
         summary_df.to_csv(output.summary, index=False)
 
-# make more elegant by having a single combination rule for all types of analyses (e.g. exact match vs. aligned)
-
-rule incorporate_metadata:
-    input:
-        summary = str(OUTPUT_DIR+"/summary/counts/all_first"+str(summary_n)+".csv"),
-        md = str(config['io']['metadata'])
-    output:
-        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first"+str(summary_n)+".csv")
-    run:
-        import pandas
-        # TODO: check if md df has a 'seq' column 
-        md_df = pandas.merge(pandas.read_csv(input.summary), pandas.read_csv(input.md), on='seq', how='outer')
-        md_df.to_csv(output.md_summary, index=False)
-
-
-rule summarize_collapse_unmapped:
-    input:
-        md_summary = str(OUTPUT_DIR+"/summary/counts/all_md_first"+str(summary_n)+".csv")
-    output:
-        md_collapsed = str(OUTPUT_DIR+"/summary/counts/all_md_collapsed_first"+str(summary_n)+".csv")
-    run:
-        import pandas
-        df_summary = pandas.read_csv(input.md_summary)
-        collapsed_summary = df_summary[["uid"]+SAMPLES].groupby("uid",dropna=False).sum()
-        collapsed_summary.to_csv(output.md_collapsed)
-
-rule map_to_protein_db:
-    input:
-        pep_tables = str(OUTPUT_DIR+"/summary/counts/all_first"+str(summary_n)+".csv"),
-        db = str(config['io']['pep_fasta'])
-    output:
-        annotated = str(OUTPUT_DIR+"/summary/counts/annotations/hits_annotated.csv")
-    threads: 1
-    run:
-        from Bio import SeqIO
-        prot_db = list(SeqIO.parse(input.db,"fasta"))
-        # danger: reads full file into memory, need a lot of memory for big files
-        o = open(output.annotated, 'w')
-        counter = 0
-        with open(input.pep_tables, 'r') as f:
-            for line in f:
-                pep = line.split(",")[1]
-                if "*" in pep:
-                    o.write(line.strip()+',internal_stop\n')
-                else:
-                    matches = []
-                    for record in prot_db:
-                        pos = record.seq.find(pep)
-                        if pos >= 0:
-                            matches.append([pos,record.id])
-                    if len(matches) == 0:
-                        o.write(line.strip()+',no_exact_matches\n')
-                    else:
-                        o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
-                counter += 1
-                if counter % 100 == 0:
-                    print("processed "+str(counter))
-        o.close()
+#rule map_to_protein_db:
+#    input:
+#        pep_tables = str(OUTPUT_DIR+"/summary/counts/all_first"+str(summary_n)+".csv"),
+#        db = str(config['io']['pep_fasta'])
+#    output:
+#        annotated = str(OUTPUT_DIR+"/summary/counts/annotations/hits_annotated.csv")
+#    threads: 1
+#    run:
+#        from Bio import SeqIO
+#        prot_db = list(SeqIO.parse(input.db,"fasta"))
+#        # danger: reads full file into memory, need a lot of memory for big files
+#        o = open(output.annotated, 'w')
+#        counter = 0
+#        with open(input.pep_tables, 'r') as f:
+#            for line in f:
+#                pep = line.split(",")[1]
+#                if "*" in pep:
+#                    o.write(line.strip()+',internal_stop\n')
+#                else:
+#                    matches = []
+#                    for record in prot_db:
+#                        pos = record.seq.find(pep)
+#                        if pos >= 0:
+#                            matches.append([pos,record.id])
+#                    if len(matches) == 0:
+#                        o.write(line.strip()+',no_exact_matches\n')
+#                    else:
+#                        o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
+#                counter += 1
+#                if counter % 100 == 0:
+#                    print("processed "+str(counter))
+#        o.close()
 

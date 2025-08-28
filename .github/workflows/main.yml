@@ -25,4 +25,5 @@ jobs:
           conda install -qy snakemake -c conda-forge -c bioconda
           pip install biopython 
           cd tests
-          snakemake summarize_collapse_unmapped -p --snakefile ../Snakefile --configfile test_config.yml --cores 1
+          snakemake summarize_mapped -p --snakefile ../Snakefile --configfile test_config.yml --cores 1
+          cat output/summary/counts/all_mapped_first120.csv
