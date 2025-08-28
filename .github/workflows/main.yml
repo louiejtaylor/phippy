@@ -26,4 +26,4 @@ jobs:
           pip install biopython 
           cd tests
           snakemake summarize_mapped -p --snakefile ../Snakefile --configfile test_config.yml --cores 1
-          cat output/summary/counts/all_mapped_first120.csv
+          cat output/summary/counts/mapped/map*.csv
