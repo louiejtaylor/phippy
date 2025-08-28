@@ -82,13 +82,21 @@ rule map_to_peptides:
         db = "{db}",
         n = int(summary_n)
     run:
+        from math import floor
+        # keys: format id_col seq_col
+        dbinfo = DB_MAP[params.db]
+        trunc_n = params.n
+        samp_join_on = "seq"
+        if dbinfo["format"] == "aa":
+            trunc_n = floor(trunc_n / 3)
+            samp_join_on = "aas"
         map_df = pandas.read_csv(input.pep_db)
-        map_df["_seq_n"] = map_df.apply(lambda r: r["seq"][:params.n], axis = 1)
+        map_df["_seq_n"] = map_df.apply(lambda r: r[dbinfo["seq_col"]][:trunc_n], axis = 1)
         mapped_df = pandas.merge(pandas.read_csv(input.pep_summary,names = [params.sample, "seq", "aas"]), 
-                                 map_df[["_seq_n","uid"]], 
-                                 left_on='seq', right_on='_seq_n', how='outer'
+                                 map_df[["_seq_n",dbinfo["id_col"]]], 
+                                 left_on=samp_join_on, right_on='_seq_n', how='outer'
                                 )
-        collapsed_summary = mapped_df[["uid",params.sample]].groupby("uid",dropna=False).sum()
+        collapsed_summary = mapped_df[[dbinfo["id_col"],params.sample]].groupby(dbinfo["id_col"],dropna=False).sum()
         collapsed_summary.to_csv(output.mapped)
 
 # for large datasets, combine_extracted has a large memory requirement. options to mitigate:
@@ -101,20 +109,23 @@ rule summarize_mapped:
         counts = expand(str(OUTPUT_DIR+"/summary/counts/mapped/{{db}}/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
     output:
         summary = str(OUTPUT_DIR+"/summary/counts/mapped/{db}_all_mapped_first"+str(summary_n)+".csv")
-    params: n = int(summary_n)
+    params: 
+        n = int(summary_n),
+        db = "{db}"
     run:
-        def open_merge_all(fp_list):
+        def _open_merge_all(fp_list):
             """
             Helper function to recursively open and merge multiple counts tables.
             """
+            dbinfo = DB_MAP[params.db]
             sample_name = fp_list[0].split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
             if len(fp_list) == 1:
                 return(pandas.read_csv(fp_list[0]))
             else:
                 new_df = pandas.read_csv(fp_list[0])
-                return(pandas.merge(new_df, open_merge_all(fp_list[1:]), on='uid', how='outer'))
+                return(pandas.merge(new_df, _open_merge_all(fp_list[1:]), on=dbinfo["id_col"], how='outer'))
 
-        summary_df = open_merge_all(input.counts)
+        summary_df = _open_merge_all(input.counts)
         summary_df.to_csv(output.summary, index=False)
 
 rule all_map:
