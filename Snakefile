@@ -66,11 +66,15 @@ rule map_to_peptide_db:
         pep_db = str(config['io']['metadata'])
     output:
         mapped = str(OUTPUT_DIR+"/summary/counts/mapped/{sample}_first"+str(summary_n)+".csv")
-    params: sample = "{sample}"
+    params:
+        sample = "{sample}",
+        n = int(summary_n)
     run:
+        map_df = pandas.read_csv(input.pep_db)
+        map_df["_seq_n"] = map_df.apply(lambda r: r.seq[:params.n], axis = 1)
         mapped_df = pandas.merge(pandas.read_csv(input.pep_summary,names = [params.sample, "seq", "aas"]), 
-                                 pandas.read_csv(input.pep_db), 
-                                 on='seq', how='outer'
+                                 map_df[["_seq_n","uid"]], 
+                                 left_on='seq', right_on='_seq_n', how='outer'
                                 )
         collapsed_summary = mapped_df[["uid",params.sample]].groupby("uid",dropna=False).sum()
         collapsed_summary.to_csv(output.mapped)
