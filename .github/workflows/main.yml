@@ -1,4 +1,4 @@
-name: workflow-test
+name: pipeline-tests
 
 on:
   push:
@@ -14,16 +14,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test workflow
         run: |
+          # SETUP
+          # install conda
           wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
           START_DIR=$(pwd)
           bash Miniconda3-latest-Linux-x86_64.sh -b -p $START_DIR/miniconda3
           export PATH=${PATH}:$START_DIR/miniconda3/bin
           CONDA_BASE=$(conda info --base)
           source $CONDA_BASE/etc/profile.d/conda.sh
+          # create test env and install reqs
           conda create -n wf_test
           conda activate wf_test
           conda install -qy snakemake -c conda-forge -c bioconda
           pip install biopython 
+          # test pipeline
           cd tests
           snakemake all_map -p --snakefile ../Snakefile --configfile test_config.yml --cores 1
+          snakemake all_annotate -p --snakefile ../Snakefile --configfile test_config.yml --cores 1
           cat output/summary/counts/mapped/map*.csv
+          cat output/summary/annotated/*.csv

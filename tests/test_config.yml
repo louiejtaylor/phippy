@@ -2,7 +2,7 @@ io:
   data: "test_data/"
   output: "output/"
   n_bases: 120 # number of bases to truncate library to (if applicable)
-  pep_fasta: "" 
+  pep_fasta: "test_annotation.fasta" 
 
 dbs:
   map1:

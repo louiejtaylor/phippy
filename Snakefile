@@ -65,7 +65,7 @@ rule all_extract:
         expand(str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first+"+str(summary_n)+".csv"), sample=SAMPLES)
 
 rule symlink_peptide_map:
-    output: 
+    output:
         pep_map = str(OUTPUT_DIR+"/dbs/pep_maps/{db}.csv")
     run:
         in_map = str(DB_MAP[wildcards.db]["fp"])
@@ -109,7 +109,7 @@ rule summarize_mapped:
         counts = expand(str(OUTPUT_DIR+"/summary/counts/mapped/{{db}}/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
     output:
         summary = str(OUTPUT_DIR+"/summary/counts/mapped/{db}_all_mapped_first"+str(summary_n)+".csv")
-    params: 
+    params:
         n = int(summary_n),
         db = "{db}"
     run:
@@ -132,36 +132,60 @@ rule all_map:
     input:
         maps = expand(str(OUTPUT_DIR+"/summary/counts/mapped/{db}_all_mapped_first"+str(summary_n)+".csv"), db=DBS)
 
-#rule map_to_protein_db:
-#    input:
-#        pep_tables = str(OUTPUT_DIR+"/summary/counts/all_first"+str(summary_n)+".csv"),
-#        db = str(config['io']['pep_fasta'])
+rule de_novo_annotate:
+    input:
+        summary = str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first"+str(summary_n)+".csv"),
+        db = str(config['io']['pep_fasta'])
+    output:
+        annotated = str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv")
+    threads: 1
+    run:
+        from Bio import SeqIO
+        prot_db = list(SeqIO.parse(input.db,"fasta"))
+        # danger: reads full file into memory, need a lot of memory for big files
+        o = open(output.annotated, 'w')
+        counter = 0
+        with open(input.summary, 'r') as f:
+            for line in f:
+                pep = line.split(",")[2].strip()
+                if "*" in pep[:-1]: # stop codon at last pos is fine
+                    o.write(line.strip()+',internal_stop\n')
+                else:
+                    pep = pep.replace("*","") # remove stop codon at last position if applicable
+                    matches = []
+                    for record in prot_db:
+                        pos = record.seq.find(pep)
+                        if pos >= 0:
+                            matches.append([pos,record.id])
+                    if len(matches) == 0:
+                        o.write(line.strip()+',no_exact_matches\n')
+                    else:
+                        o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
+                counter += 1
+                if counter % 1000 == 0:
+                    print("processed "+str(counter))
+        o.close()
+
+
+rule all_annotate:
+    input:
+        annotated = expand(str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
 #    output:
-#        annotated = str(OUTPUT_DIR+"/summary/counts/annotations/hits_annotated.csv")
+#        annotated_summary = str(OUTPUT_DIR+"/summary/counts/annotated/hits_annotated.csv")
 #    threads: 1
 #    run:
-#        from Bio import SeqIO
-#        prot_db = list(SeqIO.parse(input.db,"fasta"))
-#        # danger: reads full file into memory, need a lot of memory for big files
-#        o = open(output.annotated, 'w')
-#        counter = 0
-#        with open(input.pep_tables, 'r') as f:
-#            for line in f:
-#                pep = line.split(",")[1]
-#                if "*" in pep:
-#                    o.write(line.strip()+',internal_stop\n')
-#                else:
-#                    matches = []
-#                    for record in prot_db:
-#                        pos = record.seq.find(pep)
-#                        if pos >= 0:
-#                            matches.append([pos,record.id])
-#                    if len(matches) == 0:
-#                        o.write(line.strip()+',no_exact_matches\n')
-#                    else:
-#                        o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
-#                counter += 1
-#                if counter % 100 == 0:
-#                    print("processed "+str(counter))
-#        o.close()
+#        def _open_merge_all(fp_list):
+#            """
+#            Helper function to recursively open and merge multiple counts tables.
+#            """
+#            dbinfo = DB_MAP[params.db]
+#            sample_name = fp_list[0].split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
+#            if len(fp_list) == 1:
+#                return(pandas.read_csv(fp_list[0]))
+#            else:
+#                new_df = pandas.read_csv(fp_list[0])
+#                return(pandas.merge(new_df, _open_merge_all(fp_list[1:]), on=dbinfo["id_col"], how='outer'))
+#
+#        summary_df = _open_merge_all(input.annotated)
+#        summary_df.to_csv(output.annotated_summary, index=False)
 
