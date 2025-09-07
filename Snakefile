@@ -143,7 +143,7 @@ rule de_novo_annotate:
         from Bio import SeqIO
         prot_db = list()
         for record in SeqIO.parse(input.db,"fasta"):
-            prot_db.append(str(record.seq), record.id)
+            prot_db.append((str(record.seq), record.id))
 
         # danger: reads full file into memory, need a lot of memory for big files
         o = open(output.annotated, 'w')
@@ -153,15 +153,16 @@ rule de_novo_annotate:
                 pep = line.split(",")[2].strip()
                 if "*" in pep[:-1]: # stop codon at last pos is fine
                     o.write(line.strip()+',internal_stop\n')
+                    continue
                 else:
                     if pep[-1] == "*":
                         pep = pep[:-1]
 
                 matches = []
                 for record in prot_db:
-                    pos = record.seq.find(pep)
+                    pos = record[0].find(pep)
                     if pos >= 0:
-                        matches.append([pos,record.id])
+                        matches.append([pos,record[1]])
                 if len(matches) == 0:
                     o.write(line.strip()+',no_exact_matches\n')
                 else:
