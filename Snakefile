@@ -141,8 +141,7 @@ rule de_novo_annotate:
     threads: 1
     run:
         from Bio import SeqIO
-        prot_db = list(SeqIO.parse(input.db,"fasta"))
-        # danger: reads full file into memory, need a lot of memory for big files
+        prot_db = [(str(record.seq), record.id) for record in SeqIO.parse(input.db, "fasta")]
         o = open(output.annotated, 'w')
         counter = 0
         with open(input.summary, 'r') as f:
@@ -150,20 +149,21 @@ rule de_novo_annotate:
                 pep = line.split(",")[2].strip()
                 if "*" in pep[:-1]: # stop codon at last pos is fine
                     o.write(line.strip()+',internal_stop\n')
+                    continue
                 else:
-                    pep = pep.replace("*","") # remove stop codon at last position if applicable
-                    matches = []
-                    for record in prot_db:
-                        pos = record.seq.find(pep)
-                        if pos >= 0:
-                            matches.append([pos,record.id])
-                    if len(matches) == 0:
-                        o.write(line.strip()+',no_exact_matches\n')
-                    else:
-                        o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
-                counter += 1
-                if counter % 1000 == 0:
-                    print("processed "+str(counter))
+                    if pep[-1] == "*":
+                        pep = pep[:-1]
+
+                matches = []
+                for record in prot_db:
+                    pos = record[0].find(pep)
+                    if pos >= 0:
+                        matches.append([pos,record[1]])
+                if len(matches) == 0:
+                    o.write(line.strip()+',no_exact_matches\n')
+                else:
+                    o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
+
         o.close()
 
 
