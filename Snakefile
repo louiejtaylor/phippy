@@ -141,11 +141,7 @@ rule de_novo_annotate:
     threads: 1
     run:
         from Bio import SeqIO
-        prot_db = list()
-        for record in SeqIO.parse(input.db,"fasta"):
-            prot_db.append((str(record.seq), record.id))
-
-        # danger: reads full file into memory, need a lot of memory for big files
+        prot_db = [(str(record.seq), record.id) for record in SeqIO.parse(input.db, "fasta")]
         o = open(output.annotated, 'w')
         counter = 0
         with open(input.summary, 'r') as f:
@@ -169,7 +165,6 @@ rule de_novo_annotate:
                     o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
 
         o.close()
-
 
 rule all_annotate:
     input:
