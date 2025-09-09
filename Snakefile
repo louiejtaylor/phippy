@@ -196,24 +196,22 @@ rule all_annotate:
     input:
         annotated = expand(str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
     output:
-        annotated_summary = str(OUTPUT_DIR+"/summary/counts/annotated/hits_annotated.csv")
+        annotated_summary = str(OUTPUT_DIR+"/summary/annotated/all_first_"+str(summary_n)+"_hits_annotated.csv")
     threads: 1
     run:
-        def _open_merge_annotated(fp_list):
-            """
-            Helper function to recursively open and merge multiple counts tables.
-            """
-            sample_name = fp_list[0].split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
-            df = pandas.read_csv(fp_list[0], header = None)
+        first = True
+        for fp in input.annotated:
+            sample_name = fp.split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
+            df = pandas.read_csv(fp, header = None)
             df.drop(df[df[3] == "no_exact_matches"].index, inplace=True)
             df.drop(df[df[3] == "internal_stop"].index, inplace=True)
             df.drop(df.columns[[1,2]], axis=1, inplace=True)
             df.columns = [sample_name, "seqs"]
-            if len(fp_list) == 1:
-                return(df)
+            if first:
+                merged_df = df.copy()
+                first = False
             else:
-                return(pandas.merge(df, _open_merge_annotated(fp_list[1:]), on="seqs", how='outer'))
+                merged_df = pandas.merge(df, merged_df, on="seqs", how='outer')
 
-        summary_df = _open_merge_annotated(input.annotated)
-        summary_df.to_csv(output.annotated_summary, index=False)
+        merged_df.to_csv(output.annotated_summary, index=False)
 
