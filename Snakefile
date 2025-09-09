@@ -180,9 +180,10 @@ rule build_map_denovo:
             Drops unannotated lines.
             """
             # correctly breaks if fp_list is empty
-            df = pandas.read_csv(fp_list[0])
+            df = pandas.read_csv(fp_list[0], header=None)
+            df.drop(df[df[3] == "no_exact_matches"].index, inplace=True)
+            df.drop(df[df[3] == "internal_stop"].index, inplace=True)
             df.drop(df.columns[[0,1]], axis=1, inplace=True)
-            # REMOVE UNMAPPED
             if len(fp_list) == 1:
                 return(df.drop_duplicates())
             else:
