@@ -162,9 +162,15 @@ rule de_novo_annotate:
                 if len(matches) == 0:
                     o.write(line.strip()+',no_exact_matches\n')
                 else:
-                    o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
+                    o.write(line.strip() + "," + ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
 
         o.close()
+
+rule build_map_denovo:
+    input:
+        annotated = expand(str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
+    output:
+        map = 
 
 rule all_annotate:
     input:
