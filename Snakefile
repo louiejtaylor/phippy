@@ -164,6 +164,7 @@ rule de_novo_annotate:
                 else:
                     o.write(line.strip() + "," + ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
 
+
         o.close()
 
 rule build_map_denovo:
