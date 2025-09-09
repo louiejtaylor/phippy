@@ -162,10 +162,35 @@ rule de_novo_annotate:
                 if len(matches) == 0:
                     o.write(line.strip()+',no_exact_matches\n')
                 else:
-                    o.write(line.strip()+ ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
+                    o.write(line.strip() + "," + ";".join(["~".join([str(i) for i in m]) for m in matches])+'\n')
+
 
         o.close()
 
+rule build_map_denovo:
+    input:
+        annotated = expand(str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
+    output:
+        map = str(OUTPUT_DIR+"/summary/de_novo_map.csv")
+    threads: 1
+    run:
+        # count,ntseq,aaseq,position~accession;pos2~acc2
+        def _open_dedup(fp_list):
+            """
+            Helper function to recursively generate aa-accession map.
+            Drops unannotated lines.
+            """
+            # correctly breaks if fp_list is empty
+            df = pandas.read_csv(fp_list[0], header=None)
+            df.drop(df[df[3] == "no_exact_matches"].index, inplace=True)
+            df.drop(df[df[3] == "internal_stop"].index, inplace=True)
+            df.drop(df.columns[[0,1]], axis=1, inplace=True)
+            if len(fp_list) == 1:
+                return(df.drop_duplicates())
+            else:
+                return(pandas.concat([df, _open_dedup(fp_list[1:])], ignore_index=True).drop_duplicates())
+
+        _open_dedup(input.annotated).to_csv(output.map, index=False)
 
 rule all_annotate:
     input:
