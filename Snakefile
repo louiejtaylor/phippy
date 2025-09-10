@@ -137,7 +137,7 @@ rule de_novo_annotate:
         summary = str(OUTPUT_DIR+"/summary/counts/raw/{sample}_first"+str(summary_n)+".csv"),
         db = str(config['io']['pep_fasta'])
     output:
-        annotated = str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv")
+        annotated = str(OUTPUT_DIR+"/summary/annotated/ann_{sample}_first"+str(summary_n)+".csv")
     threads: 1
     run:
         from Bio import SeqIO
@@ -169,7 +169,7 @@ rule de_novo_annotate:
 
 rule build_map_denovo:
     input:
-        annotated = expand(str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
+        annotated = expand(str(OUTPUT_DIR+"/summary/annotated/ann_{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
     output:
         map = str(OUTPUT_DIR+"/summary/de_novo_map.csv")
     threads: 1
@@ -192,26 +192,36 @@ rule build_map_denovo:
 
         _open_dedup(input.annotated).to_csv(output.map, index=False)
 
+rule preprocess_annotation:
+    input:
+        annotated = str(OUTPUT_DIR+"/summary/annotated/ann_{sample}_first"+str(summary_n)+".csv")
+    output:
+        preprocessed = str(OUTPUT_DIR+"/summary/annotated/intermediates/summ_{sample}_first"+str(summary_n)+".csv")
+    threads: 1
+    params: sample = "{sample}"
+    run:
+        df = pandas.read_csv(input.annotated, header = None)
+        df.drop(df.columns[[1,2]], axis=1, inplace=True)
+        df.columns = [params.sample, "seqs"]
+        collapsed_summary = df.groupby("seqs",dropna=False).sum()
+        collapsed_summary.to_csv(output.preprocessed)
+
+
 rule all_annotate:
     input:
-        annotated = expand(str(OUTPUT_DIR+"/summary/annotated/{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
+        preprocessed = expand(str(OUTPUT_DIR+"/summary/annotated/intermediates/summ_{sample}_first"+str(summary_n)+".csv"), sample=SAMPLES)
     output:
         annotated_summary = str(OUTPUT_DIR+"/summary/annotated/all_first_"+str(summary_n)+"_hits_annotated.csv")
     threads: 1
     run:
         first = True
-        for fp in input.annotated:
-            sample_name = fp.split("/")[-1].replace("_first"+str(summary_n)+".csv", "")
-            df = pandas.read_csv(fp, header = None)
-            df.drop(df[df[3] == "no_exact_matches"].index, inplace=True)
-            df.drop(df[df[3] == "internal_stop"].index, inplace=True)
-            df.drop(df.columns[[1,2]], axis=1, inplace=True)
-            df.columns = [sample_name, "seqs"]
+        for fp in input.preprocessed:
+            df = pandas.read_csv(fp)
             if first:
                 merged_df = df.copy()
                 first = False
             else:
-                merged_df = pandas.merge(df, merged_df, on="seqs", how='outer')
-
+                merged_df = pandas.merge(df, merged_df.copy(), on="seqs", how='outer')
+            del df
         merged_df.to_csv(output.annotated_summary, index=False)
 
